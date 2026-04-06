@@ -1,1 +1,1009 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Atlas Tracker</title>
+  <style>
+    :root{
+      --bg:#000;
+      --panel:rgba(255,255,255,.05);
+      --panel-2:rgba(255,255,255,.03);
+      --border:rgba(255,255,255,.10);
+      --text:#fff;
+      --muted:#a1a1aa;
+      --soft:#71717a;
+      --ok:#34d399;
+      --bad:#f87171;
+      --white:#fff;
+      --black:#000;
+      --radius:24px;
+    }
 
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:Arial,Helvetica,sans-serif}
+    body{
+      min-height:100vh;
+      background:
+        radial-gradient(circle at top right, rgba(255,255,255,.08), transparent 28%),
+        radial-gradient(circle at bottom left, rgba(255,255,255,.06), transparent 22%),
+        #000;
+    }
+
+    .app{
+      max-width:460px;
+      margin:0 auto;
+      min-height:100vh;
+      padding:16px 16px 96px;
+    }
+
+    .header{
+      position:sticky;
+      top:0;
+      z-index:20;
+      margin:0 -16px;
+      padding:12px 16px 16px;
+      backdrop-filter:blur(20px);
+      background:rgba(0,0,0,.82);
+      border-bottom:1px solid var(--border);
+    }
+
+    .topbar{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+    }
+
+    .brand{
+      display:flex;
+      align-items:center;
+      gap:12px;
+      min-width:0;
+    }
+
+    .logo{
+      width:44px;
+      height:44px;
+      border-radius:16px;
+      background:#fff;
+      color:#000;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:20px;
+      font-weight:700;
+    }
+
+    .brand h1{
+      margin:0;
+      font-size:16px;
+    }
+
+    .brand p{
+      margin:4px 0 0;
+      font-size:12px;
+      color:var(--muted);
+    }
+
+    .btn{
+      border:1px solid var(--border);
+      background:var(--panel);
+      color:var(--text);
+      border-radius:16px;
+      padding:12px 14px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:8px;
+      cursor:pointer;
+      text-decoration:none;
+      font-size:14px;
+    }
+
+    .btn:disabled{
+      opacity:.5;
+      cursor:not-allowed;
+    }
+
+    .btn.white{
+      background:#fff;
+      color:#000;
+    }
+
+    .search-wrap{
+      margin-top:14px;
+      position:relative;
+    }
+
+    .search{
+      width:100%;
+      padding:14px 14px 14px 42px;
+      border-radius:18px;
+      border:1px solid var(--border);
+      background:var(--panel);
+      color:#fff;
+      outline:none;
+      font-size:14px;
+    }
+
+    .search::placeholder,
+    input::placeholder{
+      color:var(--soft);
+    }
+
+    .search-icon{
+      position:absolute;
+      left:14px;
+      top:50%;
+      transform:translateY(-50%);
+      color:var(--soft);
+      font-size:14px;
+    }
+
+    .screen{
+      display:none;
+      margin-top:18px;
+      gap:16px;
+      flex-direction:column;
+    }
+
+    .screen.active{
+      display:flex;
+    }
+
+    .card{
+      border:1px solid var(--border);
+      background:var(--panel);
+      border-radius:28px;
+      overflow:hidden;
+    }
+
+    .card-header{
+      padding:18px 18px 10px;
+    }
+
+    .card-title{
+      margin:0;
+      font-size:18px;
+      font-weight:700;
+    }
+
+    .card-desc{
+      margin:6px 0 0;
+      font-size:13px;
+      color:var(--muted);
+      line-height:1.45;
+    }
+
+    .card-body{
+      padding:0 18px 18px;
+    }
+
+    .stats{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:12px;
+    }
+
+    .stat{
+      border:1px solid var(--border);
+      background:var(--panel);
+      border-radius:24px;
+      padding:16px;
+    }
+
+    .stat-label{
+      font-size:12px;
+      color:var(--muted);
+    }
+
+    .stat-value{
+      margin-top:8px;
+      font-size:22px;
+      font-weight:700;
+    }
+
+    .stat-sub{
+      margin-top:8px;
+      font-size:12px;
+      color:var(--muted);
+    }
+
+    .empty{
+      text-align:center;
+      padding:34px 22px;
+      border:1px dashed var(--border);
+      background:var(--panel-2);
+      border-radius:28px;
+    }
+
+    .empty-icon{
+      width:56px;
+      height:56px;
+      margin:0 auto 16px;
+      border-radius:22px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      border:1px solid var(--border);
+      background:var(--panel);
+      font-size:24px;
+    }
+
+    .empty h3{
+      margin:0;
+      font-size:20px;
+    }
+
+    .empty p{
+      margin:10px auto 0;
+      max-width:320px;
+      color:var(--muted);
+      font-size:14px;
+      line-height:1.5;
+    }
+
+    .empty .btn{
+      margin-top:18px;
+    }
+
+    .field{
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      margin-bottom:14px;
+    }
+
+    .field label{
+      font-size:13px;
+      color:var(--muted);
+    }
+
+    .input{
+      width:100%;
+      padding:14px;
+      border-radius:18px;
+      border:1px solid var(--border);
+      background:var(--panel);
+      color:#fff;
+      outline:none;
+      font-size:14px;
+    }
+
+    .chain-grid{
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:8px;
+    }
+
+    .chain-btn{
+      border:1px solid var(--border);
+      background:var(--panel);
+      color:#fff;
+      padding:12px 10px;
+      border-radius:16px;
+      font-size:13px;
+      cursor:pointer;
+    }
+
+    .chain-btn.active{
+      background:#fff;
+      color:#000;
+    }
+
+    .error{
+      margin-top:12px;
+      padding:12px 14px;
+      border-radius:16px;
+      border:1px solid rgba(248,113,113,.2);
+      background:rgba(248,113,113,.10);
+      color:#fca5a5;
+      font-size:13px;
+      line-height:1.45;
+    }
+
+    .success{
+      margin-top:12px;
+      padding:12px 14px;
+      border-radius:16px;
+      border:1px solid rgba(52,211,153,.2);
+      background:rgba(52,211,153,.10);
+      color:#86efac;
+      font-size:13px;
+    }
+
+    .wallet-list{
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+    }
+
+    .wallet-item{
+      border:1px solid var(--border);
+      background:rgba(0,0,0,.3);
+      border-radius:24px;
+      padding:16px;
+    }
+
+    .wallet-top{
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+      align-items:flex-start;
+    }
+
+    .wallet-main{
+      min-width:0;
+    }
+
+    .wallet-name{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      font-weight:700;
+      flex-wrap:wrap;
+    }
+
+    .badge{
+      border:1px solid var(--border);
+      background:rgba(255,255,255,.10);
+      padding:4px 8px;
+      border-radius:999px;
+      font-size:11px;
+      color:#fff;
+    }
+
+    .wallet-address{
+      margin-top:6px;
+      color:var(--muted);
+      font-size:13px;
+      word-break:break-all;
+    }
+
+    .wallet-actions{
+      display:flex;
+      gap:8px;
+      flex-shrink:0;
+    }
+
+    .icon-btn{
+      width:40px;
+      height:40px;
+      border-radius:14px;
+      border:1px solid var(--border);
+      background:var(--panel);
+      color:#fff;
+      cursor:pointer;
+    }
+
+    .wallet-meta{
+      margin-top:14px;
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:10px;
+    }
+
+    .meta-box{
+      border:1px solid var(--border);
+      background:rgba(0,0,0,.3);
+      border-radius:16px;
+      padding:12px;
+    }
+
+    .meta-label{
+      font-size:12px;
+      color:var(--muted);
+    }
+
+    .meta-value{
+      margin-top:6px;
+      font-size:14px;
+      font-weight:700;
+    }
+
+    .worker-note{
+      margin-top:12px;
+      padding:12px;
+      border-radius:16px;
+      border:1px solid var(--border);
+      background:rgba(0,0,0,.3);
+      color:var(--muted);
+      font-size:13px;
+      word-break:break-all;
+    }
+
+    .tabs{
+      display:flex;
+      gap:8px;
+      overflow:auto;
+      padding-bottom:2px;
+    }
+
+    .tab-btn{
+      white-space:nowrap;
+      border:1px solid var(--border);
+      background:var(--panel);
+      color:#fff;
+      padding:10px 14px;
+      border-radius:16px;
+      font-size:13px;
+      cursor:pointer;
+    }
+
+    .tab-btn.active{
+      background:#fff;
+      color:#000;
+    }
+
+    .nav{
+      position:fixed;
+      left:0;
+      right:0;
+      bottom:0;
+      z-index:30;
+      border-top:1px solid var(--border);
+      background:rgba(0,0,0,.90);
+      backdrop-filter:blur(20px);
+      padding:12px;
+    }
+
+    .nav-inner{
+      max-width:460px;
+      margin:0 auto;
+      display:flex;
+      gap:8px;
+    }
+
+    .nav-btn{
+      flex:1;
+      min-width:0;
+      border:none;
+      background:var(--panel);
+      color:#d4d4d8;
+      border-radius:18px;
+      padding:12px 8px;
+      font-size:12px;
+      cursor:pointer;
+    }
+
+    .nav-btn.active{
+      background:#fff;
+      color:#000;
+      font-weight:700;
+    }
+
+    .muted{
+      color:var(--muted);
+    }
+
+    @media (min-width: 900px){
+      .app{
+        max-width:900px;
+      }
+      .stats{
+        grid-template-columns:repeat(4,1fr);
+      }
+      .nav-inner{
+        max-width:460px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="topbar">
+        <div class="brand">
+          <div class="logo">₳</div>
+          <div>
+            <h1>Atlas Tracker</h1>
+            <p>Mobile V1 · Multichain watcher</p>
+          </div>
+        </div>
+        <button class="btn" id="headerAddBtn">＋ Add</button>
+      </div>
+
+      <div class="search-wrap">
+        <span class="search-icon">⌕</span>
+        <input class="search" id="searchInput" placeholder="Search wallet alias or address" />
+      </div>
+    </header>
+
+    <section id="dashboardScreen" class="screen active"></section>
+    <section id="portfolioScreen" class="screen"></section>
+    <section id="watchlistScreen" class="screen"></section>
+    <section id="summaryScreen" class="screen"></section>
+  </div>
+
+  <nav class="nav">
+    <div class="nav-inner">
+      <button class="nav-btn active" data-screen="dashboard">Home</button>
+      <button class="nav-btn" data-screen="portfolio">Portfolio</button>
+      <button class="nav-btn" data-screen="watchlist">Watchlist</button>
+      <button class="nav-btn" data-screen="summary">12h</button>
+    </div>
+  </nav>
+
+  <script>
+    const WORKER_BASE_URL = "https://bitter-sea-c49b.ramirezricardocontacto.workers.dev";
+    const STORAGE_KEY = "atlas_tracker_watchers_v1";
+
+    const state = {
+      activeScreen: "dashboard",
+      selectedChain: "All",
+      query: "",
+      loading: false,
+      showSaved: false,
+      formError: "",
+      newWatcher: {
+        alias: "",
+        address: "",
+        chain: "Solana"
+      },
+      watchers: loadWatchers()
+    };
+
+    function loadWatchers() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        return raw ? JSON.parse(raw) : [];
+      } catch {
+        return [];
+      }
+    }
+
+    function persistWatchers() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state.watchers));
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function validateAddress(address, chain) {
+      const trimmed = address.trim();
+      if (chain === "Ethereum") return /^0x[a-fA-F0-9]{40}$/.test(trimmed);
+      if (chain === "Bitcoin") return /^(bc1|[13])[a-zA-HJ-NP-Z0-9]{20,74}$/.test(trimmed);
+      return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(trimmed);
+    }
+
+    async function fetchWalletData(address, chain) {
+      let endpoint = "";
+      if (chain === "Solana") endpoint = `/solana?address=${encodeURIComponent(address)}`;
+      if (chain === "Ethereum") endpoint = `/ethereum?address=${encodeURIComponent(address)}`;
+      if (chain === "Bitcoin") endpoint = `/bitcoin?address=${encodeURIComponent(address)}`;
+
+      const response = await fetch(`${WORKER_BASE_URL}${endpoint}`);
+      const data = await response.json();
+
+      if (!response.ok || data?.success === false) {
+        throw new Error(data?.error || "No se pudo consultar la wallet en el worker.");
+      }
+
+      return data;
+    }
+
+    function getTrackedChains() {
+      return [...new Set(state.watchers.map(w => w.chain))];
+    }
+
+    function getFilteredWatchers() {
+      const q = state.query.trim().toLowerCase();
+      return state.watchers.filter(wallet => {
+        const chainMatch = state.selectedChain === "All" || wallet.chain === state.selectedChain;
+        const queryMatch =
+          !q ||
+          wallet.alias.toLowerCase().includes(q) ||
+          wallet.address.toLowerCase().includes(q);
+        return chainMatch && queryMatch;
+      });
+    }
+
+    function setScreen(screen) {
+      state.activeScreen = screen;
+      document.querySelectorAll(".screen").forEach(el => el.classList.remove("active"));
+      document.getElementById(`${screen}Screen`).classList.add("active");
+      document.querySelectorAll(".nav-btn").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.screen === screen);
+      });
+      render();
+    }
+
+    function setChain(chain) {
+      state.selectedChain = chain;
+      render();
+    }
+
+    function updateFormField(field, value) {
+      state.formError = "";
+      state.newWatcher[field] = value;
+      render();
+    }
+
+    async function saveWatcher() {
+      const alias = state.newWatcher.alias.trim();
+      const address = state.newWatcher.address.trim();
+      const chain = state.newWatcher.chain;
+
+      if (!alias || !address) {
+        state.formError = "Alias y wallet address son obligatorios.";
+        render();
+        return;
+      }
+
+      if (!validateAddress(address, chain)) {
+        state.formError = `La dirección no parece válida para ${chain}.`;
+        render();
+        return;
+      }
+
+      const duplicated = state.watchers.some(
+        wallet =>
+          wallet.address.toLowerCase() === address.toLowerCase() &&
+          wallet.chain === chain
+      );
+
+      if (duplicated) {
+        state.formError = "Esa wallet ya está siendo trackeada.";
+        render();
+        return;
+      }
+
+      try {
+        state.loading = true;
+        state.formError = "";
+        render();
+
+        const blockchainData = await fetchWalletData(address, chain);
+
+        state.watchers.unshift({
+          alias,
+          address,
+          chain,
+          change: 0,
+          lastAction: "Fetched from blockchain",
+          updated: "Just now",
+          rawData: blockchainData
+        });
+
+        persistWatchers();
+
+        state.newWatcher = {
+          alias: "",
+          address: "",
+          chain: "Solana"
+        };
+
+        state.loading = false;
+        state.showSaved = true;
+        state.activeScreen = "watchlist";
+        render();
+
+        setTimeout(() => {
+          state.showSaved = false;
+          render();
+        }, 2200);
+      } catch (error) {
+        state.loading = false;
+        state.formError = error?.message || "No se pudo guardar y consultar la wallet.";
+        render();
+      }
+    }
+
+    function deleteWatcher(address, chain) {
+      state.watchers = state.watchers.filter(
+        wallet => !(wallet.address === address && wallet.chain === chain)
+      );
+      persistWatchers();
+      render();
+    }
+
+    function renderDashboard() {
+      const hasWallets = state.watchers.length > 0;
+      const trackedChains = getTrackedChains();
+
+      return `
+        <div class="stats">
+          <div class="stat">
+            <div class="stat-label">Tracked Wallets</div>
+            <div class="stat-value">${state.watchers.length}</div>
+            <div class="stat-sub">${hasWallets ? `${trackedChains.length} chains selected` : "No wallets added yet"}</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Portfolio Value</div>
+            <div class="stat-value">${hasWallets ? "Pending" : "$0"}</div>
+            <div class="stat-sub">${hasWallets ? "Waiting for first snapshot" : "Add a wallet to begin tracking"}</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">12h Changes</div>
+            <div class="stat-value">${hasWallets ? "Pending" : "—"}</div>
+            <div class="stat-sub">${hasWallets ? "Will appear after sync" : "No activity without wallets"}</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Chains Active</div>
+            <div class="stat-value">${trackedChains.length}</div>
+            <div class="stat-sub">${hasWallets ? escapeHtml(trackedChains.join(", ")) : "No chains selected yet"}</div>
+          </div>
+        </div>
+
+        ${
+          !hasWallets
+            ? `
+          <div class="empty">
+            <div class="empty-icon">◈</div>
+            <h3>No estás trackeando ninguna wallet</h3>
+            <p>El dashboard arranca vacío. Agrega una wallet de Solana, Ethereum o Bitcoin.</p>
+            <button class="btn white" onclick="setScreen('watchlist')">＋ Agregar primera wallet</button>
+          </div>
+        `
+            : `
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">Tracked wallets</h3>
+              <p class="card-desc">Estas son las wallets actualmente registradas por el usuario.</p>
+            </div>
+            <div class="card-body">
+              <div class="wallet-list">
+                ${state.watchers
+                  .map(
+                    wallet => `
+                  <div class="wallet-item">
+                    <div class="wallet-top">
+                      <div class="wallet-main">
+                        <div class="wallet-name">
+                          <span>${escapeHtml(wallet.alias)}</span>
+                          <span class="badge">${escapeHtml(wallet.chain)}</span>
+                        </div>
+                        <div class="wallet-address">${escapeHtml(wallet.address)}</div>
+                        <div class="worker-note">
+                          ${escapeHtml(wallet.lastAction)}<br>
+                          <span class="muted">Worker conectado · ${escapeHtml(wallet.rawData?.chain || wallet.chain)}</span>
+                        </div>
+                      </div>
+                      <div class="wallet-actions">
+                        <button class="icon-btn" onclick="deleteWatcher('${wallet.address}','${wallet.chain}')">🗑</button>
+                      </div>
+                    </div>
+                  </div>
+                `
+                  )
+                  .join("")}
+              </div>
+            </div>
+          </div>
+        `
+        }
+      `;
+    }
+
+    function renderPortfolio() {
+      const hasWallets = state.watchers.length > 0;
+
+      if (!hasWallets) {
+        return `
+          <div class="empty">
+            <div class="empty-icon">◈</div>
+            <h3>Aún no hay portfolio</h3>
+            <p>La sección de portfolio permanece vacía hasta que agregues wallets.</p>
+            <button class="btn white" onclick="setScreen('watchlist')">＋ Agregar wallet</button>
+          </div>
+        `;
+      }
+
+      return `
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Holdings breakdown</h3>
+            <p class="card-desc">Preview mode. No real token balances parsed yet.</p>
+          </div>
+          <div class="card-body">
+            <div class="tabs">
+              ${["All", "Solana", "Ethereum", "Bitcoin"]
+                .map(
+                  chain => `
+                <button class="tab-btn ${state.selectedChain === chain ? "active" : ""}" onclick="setChain('${chain}')">
+                  ${chain}
+                </button>
+              `
+                )
+                .join("")}
+            </div>
+          </div>
+        </div>
+
+        <div class="empty">
+          <div class="empty-icon">◈</div>
+          <h3>Sin balances cargados</h3>
+          <p>Las wallets ya fueron agregadas, pero esta V1 todavía no parsea balances bonitos.</p>
+        </div>
+      `;
+    }
+
+    function renderWatchlist() {
+      const watchers = getFilteredWatchers();
+
+      return `
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Add wallet watcher</h3>
+            <p class="card-desc">Register a public address for testing</p>
+          </div>
+          <div class="card-body">
+            <div class="field">
+              <label>Alias</label>
+              <input
+                class="input"
+                placeholder="Alias"
+                value="${escapeHtml(state.newWatcher.alias)}"
+                oninput="updateFormField('alias', this.value)"
+              />
+            </div>
+
+            <div class="field">
+              <label>Public wallet address</label>
+              <input
+                class="input"
+                placeholder="Public wallet address"
+                value="${escapeHtml(state.newWatcher.address)}"
+                oninput="updateFormField('address', this.value)"
+              />
+            </div>
+
+            <div class="chain-grid">
+              ${["Solana", "Ethereum", "Bitcoin"]
+                .map(
+                  chain => `
+                <button class="chain-btn ${state.newWatcher.chain === chain ? "active" : ""}" onclick="updateFormField('chain', '${chain}')">
+                  ${chain}
+                </button>
+              `
+                )
+                .join("")}
+            </div>
+
+            <button class="btn white" style="width:100%;margin-top:14px" onclick="saveWatcher()" ${state.loading ? "disabled" : ""}>
+              ${state.loading ? "Consultando..." : "＋ Save watcher"}
+            </button>
+
+            ${state.formError ? `<div class="error">${escapeHtml(state.formError)}</div>` : ""}
+            ${state.showSaved ? `<div class="success">Wallet guardada correctamente.</div>` : ""}
+          </div>
+        </div>
+
+        ${
+          watchers.length === 0
+            ? `
+          <div class="empty">
+            <div class="empty-icon">◈</div>
+            <h3>No wallets tracked</h3>
+            <p>Todavía no hay ninguna wallet en la watchlist. Agrega la primera arriba.</p>
+          </div>
+        `
+            : `
+          <div class="wallet-list">
+            ${watchers
+              .map(
+                wallet => `
+              <div class="wallet-item">
+                <div class="wallet-top">
+                  <div class="wallet-main">
+                    <div class="wallet-name">
+                      <span>${escapeHtml(wallet.alias)}</span>
+                      <span class="badge">${escapeHtml(wallet.chain)}</span>
+                    </div>
+                    <div class="wallet-address">${escapeHtml(wallet.address)}</div>
+                  </div>
+                  <div class="wallet-actions">
+                    <button class="icon-btn">›</button>
+                    <button class="icon-btn" onclick="deleteWatcher('${wallet.address}','${wallet.chain}')">🗑</button>
+                  </div>
+                </div>
+
+                <div class="wallet-meta">
+                  <div class="meta-box">
+                    <div class="meta-label">12h change</div>
+                    <div class="meta-value" style="color:${wallet.change >= 0 ? "var(--ok)" : "var(--bad)"}">
+                      ${wallet.change >= 0 ? "+" : ""}${wallet.change}%
+                    </div>
+                  </div>
+                  <div class="meta-box">
+                    <div class="meta-label">Updated</div>
+                    <div class="meta-value">${escapeHtml(wallet.updated)}</div>
+                  </div>
+                </div>
+
+                <div class="worker-note">
+                  ${escapeHtml(wallet.lastAction)}
+                  ${
+                    wallet.rawData
+                      ? `<br><span class="muted">Worker conectado · ${escapeHtml(wallet.rawData.chain || wallet.chain)}</span>`
+                      : ""
+                  }
+                </div>
+              </div>
+            `
+              )
+              .join("")}
+          </div>
+        `
+        }
+      `;
+    }
+
+    function renderSummary() {
+      const hasWallets = state.watchers.length > 0;
+
+      return `
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Next snapshot</h3>
+            <p class="card-desc">Portfolio and watched wallets refresh every 12 hours</p>
+          </div>
+          <div class="card-body">
+            <div style="font-size:40px;font-weight:700">04:21:17</div>
+            <button class="btn white" style="width:100%;margin-top:16px">⟳ Force preview refresh</button>
+          </div>
+        </div>
+
+        ${
+          !hasWallets
+            ? `
+          <div class="empty">
+            <div class="empty-icon">◈</div>
+            <h3>No hay resumen aún</h3>
+            <p>Los resúmenes de 12 horas aparecerán cuando exista al menos una wallet agregada.</p>
+          </div>
+        `
+            : `
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">Protocol notes</h3>
+              <p class="card-desc">Scope locked for V1</p>
+            </div>
+            <div class="card-body" style="display:grid;gap:10px">
+              <div class="meta-box">Read-only wallet tracking</div>
+              <div class="meta-box">Chains: Solana, Ethereum, Bitcoin</div>
+              <div class="meta-box">Refresh cadence: every 12 hours</div>
+              <div class="meta-box">No swaps, no custody, no signatures</div>
+            </div>
+          </div>
+        `
+        }
+      `;
+    }
+
+    function render() {
+      document.getElementById("dashboardScreen").innerHTML = renderDashboard();
+      document.getElementById("portfolioScreen").innerHTML = renderPortfolio();
+      document.getElementById("watchlistScreen").innerHTML = renderWatchlist();
+      document.getElementById("summaryScreen").innerHTML = renderSummary();
+
+      document.getElementById("searchInput").value = state.query;
+      document.getElementById("headerAddBtn").onclick = () => setScreen("watchlist");
+    }
+
+    document.getElementById("searchInput").addEventListener("input", (e) => {
+      state.query = e.target.value;
+      render();
+    });
+
+    document.querySelectorAll(".nav-btn").forEach(btn => {
+      btn.addEventListener("click", () => setScreen(btn.dataset.screen));
+    });
+
+    window.setScreen = setScreen;
+    window.setChain = setChain;
+    window.updateFormField = updateFormField;
+    window.saveWatcher = saveWatcher;
+    window.deleteWatcher = deleteWatcher;
+
+    render();
+  </script>
+</body>
+</html>
