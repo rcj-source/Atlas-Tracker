@@ -585,6 +585,8 @@
       justify-content:space-between;
       font-size:12px;
       color:var(--muted);
+      gap:8px;
+      flex-wrap:wrap;
     }
 
     @media (min-width: 900px){
@@ -639,6 +641,31 @@
     const WORKER_BASE_URL = "https://bitter-sea-c49b.ramirezricardocontacto.workers.dev";
     const STORAGE_KEY = "atlas_tracker_watchers_v1";
 
+    // Opcional: si tienes Demo API key de CoinGecko, pégala aquí.
+    // Si la dejas vacía, el fallback de precios puede no funcionar en algunos navegadores/rate limits.
+    const COINGECKO_DEMO_KEY = "";
+
+    const SYMBOL_TO_COINGECKO_ID = {
+      BTC: "bitcoin",
+      ETH: "ethereum",
+      SOL: "solana",
+      USDT: "tether",
+      USDC: "usd-coin",
+      DAI: "dai",
+      BONK: "bonk",
+      WIF: "dogwifcoin",
+      JUP: "jupiter-exchange-solana",
+      PYTH: "pyth-network",
+      RAY: "raydium",
+      JTO: "jito-governance-token",
+      ORCA: "orca",
+      MEW: "cat-in-a-dogs-world",
+      POPCAT: "popcat",
+      FARTCOIN: "fartcoin"
+    };
+
+    const STABLES = new Set(["USDT", "USDC", "DAI", "USDS", "FDUSD", "TUSD"]);
+
     const state = {
       activeScreen: "dashboard",
       selectedChain: "All",
@@ -646,6 +673,7 @@
       loading: false,
       showSaved: false,
       formError: "",
+      priceCache: {},
       newWatcher: {
         alias: "",
         address: "",
@@ -705,6 +733,46 @@
       return data;
     }
 
+    async function fetchCoinGeckoPrices(symbols) {
+      const ids = [...new Set(
+        symbols
+          .map(sym => SYMBOL_TO_COINGECKO_ID[sym])
+          .filter(Boolean)
+      )];
+
+      const result = {};
+
+      for (const sym of symbols) {
+        if (STABLES.has(sym)) result[sym] = 1;
+      }
+
+      if (!ids.length) return result;
+
+      const params = new URLSearchParams({
+        ids: ids.join(","),
+        vs_currencies: "usd",
+        include_24hr_change: "true"
+      });
+
+      if (COINGECKO_DEMO_KEY) {
+        params.set("x_cg_demo_api_key", COINGECKO_DEMO_KEY);
+      }
+
+      const url = `https://api.coingecko.com/api/v3/simple/price?${params.toString()}`;
+      const response = await fetch(url);
+      if (!response.ok) return result;
+
+      const data = await response.json();
+
+      for (const [symbol, id] of Object.entries(SYMBOL_TO_COINGECKO_ID)) {
+        if (data[id]?.usd != null) {
+          result[symbol] = Number(data[id].usd);
+        }
+      }
+
+      return result;
+    }
+
     function getTrackedChains() {
       return [...new Set(state.watchers.map(w => w.chain))];
     }
@@ -721,46 +789,90 @@
       });
     }
 
+    function pickFirstNumber(...values) {
+      for (const v of values) {
+        const n = Number(v);
+        if (Number.isFinite(n) && n !== 0) return n;
+      }
+      return 0;
+    }
+
     function parseSolanaAssets(raw) {
       const assets = [];
       const data = raw?.data || {};
 
-      if (typeof data.nativeBalance === "number" && data.nativeBalance > 0) {
-        const solAmount = data.nativeBalance / 1e9;
+      const nativeLamports =
+        pickFirstNumber(
+          data.nativeBalance,
+          data.native_balance,
+          data.lamports,
+          data.solBalanceLamports
+        );
+
+      if (nativeLamports > 0) {
         assets.push({
           symbol: "SOL",
           name: "Solana",
           chain: "Solana",
-          amount: solAmount,
+          amount: nativeLamports / 1e9,
           price: 0,
           value: 0
         });
       }
 
-      const tokens = Array.isArray(data.tokens) ? data.tokens : [];
-      for (const token of tokens) {
+      const tokenLists = [
+        ...(Array.isArray(data.tokens) ? data.tokens : []),
+        ...(Array.isArray(data.tokenBalances) ? data.tokenBalances : []),
+        ...(Array.isArray(data.fungibleTokens) ? data.fungibleTokens : [])
+      ];
+
+      for (const token of tokenLists) {
         const amount =
-          Number(token.amount) ||
-          Number(token.tokenAmount) ||
-          Number(token.balance) ||
-          0;
+          pickFirstNumber(
+            token.amount,
+            token.tokenAmount,
+            token.balance,
+            token.uiAmount,
+            token.ui_amount,
+            token.amount_ui
+          );
 
         const price =
-          Number(token.priceUsd) ||
-          Number(token.price) ||
-          Number(token.usdPrice) ||
-          0;
+          pickFirstNumber(
+            token.priceUsd,
+            token.price_usd,
+            token.usdPrice,
+            token.price,
+            token.tokenPrice
+          );
 
         const value =
-          Number(token.valueUsd) ||
-          Number(token.usdValue) ||
-          (amount * price) ||
-          0;
+          pickFirstNumber(
+            token.valueUsd,
+            token.value_usd,
+            token.usdValue,
+            token.usd_value,
+            token.quote,
+            amount * price
+          );
+
+        const symbol =
+          token.symbol ||
+          token.tokenSymbol ||
+          token.ticker ||
+          token.metadata?.symbol ||
+          "TOKEN";
+
+        const name =
+          token.name ||
+          token.tokenName ||
+          token.metadata?.name ||
+          symbol;
 
         if (amount > 0 || value > 0) {
           assets.push({
-            symbol: token.symbol || "TOKEN",
-            name: token.name || token.symbol || "Unknown Token",
+            symbol,
+            name,
             chain: "Solana",
             amount,
             price,
@@ -773,20 +885,35 @@
     }
 
     function parseEvmAssets(raw, chainLabel) {
-      const items = raw?.data?.data?.items || raw?.data?.items || [];
+      const items =
+        raw?.data?.data?.items ||
+        raw?.data?.items ||
+        [];
+
       const assets = [];
 
       for (const item of items) {
-        const balance = Number(item.balance || 0);
-        const decimals = Number(item.contract_decimals || 18);
-        const amount = balance / Math.pow(10, decimals);
-        const price = Number(item.quote_rate || 0);
-        const value = Number(item.quote || (amount * price) || 0);
+        const balanceRaw = Number(item.balance || 0);
+        const decimals = Number(item.contract_decimals ?? 18);
+        const amount = balanceRaw / Math.pow(10, decimals);
+        const price = pickFirstNumber(item.quote_rate, item.price, item.usd_rate);
+        const value = pickFirstNumber(item.quote, item.value, amount * price);
+
+        const symbol =
+          item.contract_ticker_symbol ||
+          item.ticker_symbol ||
+          item.symbol ||
+          "TOKEN";
+
+        const name =
+          item.contract_name ||
+          item.name ||
+          symbol;
 
         if (amount > 0 || value > 0) {
           assets.push({
-            symbol: item.contract_ticker_symbol || item.ticker_symbol || "TOKEN",
-            name: item.contract_name || item.contract_ticker_symbol || "Unknown Token",
+            symbol,
+            name,
             chain: chainLabel,
             amount,
             price,
@@ -827,15 +954,48 @@
             chain: asset.chain,
             amount: 0,
             value: 0,
-            price: asset.price || 0
+            price: 0
           };
         }
+
         merged[key].amount += Number(asset.amount || 0);
         merged[key].value += Number(asset.value || 0);
-        if (asset.price) merged[key].price = asset.price;
+        if (asset.price) merged[key].price = Number(asset.price || 0);
       }
 
-      return Object.values(merged).sort((a, b) => b.value - a.value);
+      const mergedAssets = Object.values(merged);
+
+      for (const asset of mergedAssets) {
+        if ((!asset.value || asset.value === 0) && asset.amount > 0) {
+          if (STABLES.has(asset.symbol)) {
+            asset.price = 1;
+            asset.value = asset.amount;
+          } else if (state.priceCache[asset.symbol]) {
+            asset.price = state.priceCache[asset.symbol];
+            asset.value = asset.amount * asset.price;
+          }
+        }
+      }
+
+      return mergedAssets.sort((a, b) => b.value - a.value);
+    }
+
+    async function refreshPriceCache() {
+      const rawAssets = [];
+
+      for (const wallet of state.watchers) {
+        rawAssets.push(...parseWatcherAssets(wallet));
+      }
+
+      const symbols = [...new Set(rawAssets.map(a => a.symbol).filter(Boolean))];
+      if (!symbols.length) return;
+
+      try {
+        const prices = await fetchCoinGeckoPrices(symbols);
+        state.priceCache = { ...state.priceCache, ...prices };
+      } catch {
+        // silencio intencional
+      }
     }
 
     function getPortfolioTotalValue() {
@@ -955,6 +1115,7 @@
           rawData: blockchainData
         });
 
+        await refreshPriceCache();
         persistWatchers();
 
         state.newWatcher = {
@@ -1000,8 +1161,8 @@
           </div>
           <div class="stat">
             <div class="stat-label">Portfolio Value</div>
-            <div class="stat-value">${hasWallets ? "Loaded" : "$0"}</div>
-            <div class="stat-sub">${hasWallets ? "Worker connected" : "Add a wallet to begin tracking"}</div>
+            <div class="stat-value">${hasWallets ? formatUsd(getPortfolioTotalValue()) : "$0"}</div>
+            <div class="stat-sub">${hasWallets ? "Estimated with fallback prices" : "Add a wallet to begin tracking"}</div>
           </div>
           <div class="stat">
             <div class="stat-label">12h Changes</div>
@@ -1154,7 +1315,7 @@
                         <div class="asset-symbol">${escapeHtml(asset.symbol)}</div>
                       </div>
                       <div class="asset-right">
-                        <div class="asset-value">${formatUsd(asset.value)}</div>
+                        <div class="asset-value">${asset.value > 0 ? formatUsd(asset.value) : "No price"}</div>
                         <div class="asset-amount">${formatAmount(asset.amount)} ${escapeHtml(asset.symbol)}</div>
                       </div>
                     </div>
@@ -1165,7 +1326,7 @@
 
                     <div class="asset-footer">
                       <span>${pct.toFixed(2)}% del portafolio</span>
-                      <span>${asset.price > 0 ? formatUsd(asset.price) + " price" : "No price"}</span>
+                      <span>${asset.price > 0 ? formatUsd(asset.price) + " price" : "No price feed"}</span>
                     </div>
                   </div>
                 `;
@@ -1356,7 +1517,10 @@
     window.saveWatcher = saveWatcher;
     window.deleteWatcher = deleteWatcher;
 
-    render();
+    (async function init() {
+      await refreshPriceCache();
+      render();
+    })();
   </script>
 </body>
 </html>
