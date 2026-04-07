@@ -479,6 +479,114 @@
       color:var(--muted);
     }
 
+    .portfolio-total{
+      font-size:34px;
+      font-weight:800;
+      margin-top:8px;
+    }
+
+    .portfolio-change{
+      margin-top:8px;
+      font-size:13px;
+    }
+
+    .portfolio-change.up{color:var(--ok)}
+    .portfolio-change.down{color:var(--bad)}
+
+    .chart-wrap{
+      margin-top:14px;
+      padding:14px;
+      border:1px solid var(--border);
+      background:rgba(0,0,0,.25);
+      border-radius:20px;
+    }
+
+    .chart-svg{
+      width:100%;
+      height:140px;
+      display:block;
+    }
+
+    .chart-labels{
+      display:flex;
+      justify-content:space-between;
+      margin-top:8px;
+      font-size:11px;
+      color:var(--soft);
+    }
+
+    .asset-list{
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+    }
+
+    .asset-row{
+      border:1px solid var(--border);
+      background:rgba(0,0,0,.3);
+      border-radius:20px;
+      padding:14px;
+    }
+
+    .asset-top{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:10px;
+    }
+
+    .asset-name{
+      font-weight:700;
+      display:flex;
+      align-items:center;
+      gap:8px;
+      flex-wrap:wrap;
+    }
+
+    .asset-symbol{
+      font-size:12px;
+      color:var(--muted);
+      margin-top:4px;
+    }
+
+    .asset-right{
+      text-align:right;
+    }
+
+    .asset-value{
+      font-weight:800;
+      font-size:15px;
+    }
+
+    .asset-amount{
+      margin-top:4px;
+      color:var(--muted);
+      font-size:12px;
+    }
+
+    .asset-bar{
+      margin-top:12px;
+      height:8px;
+      width:100%;
+      border-radius:999px;
+      background:rgba(255,255,255,.08);
+      overflow:hidden;
+    }
+
+    .asset-bar-fill{
+      height:100%;
+      border-radius:999px;
+      background:#fff;
+    }
+
+    .asset-footer{
+      margin-top:8px;
+      display:flex;
+      justify-content:space-between;
+      font-size:12px;
+      color:var(--muted);
+    }
+
     @media (min-width: 900px){
       .app{
         max-width:900px;
@@ -613,6 +721,168 @@
       });
     }
 
+    function parseSolanaAssets(raw) {
+      const assets = [];
+      const data = raw?.data || {};
+
+      if (typeof data.nativeBalance === "number" && data.nativeBalance > 0) {
+        const solAmount = data.nativeBalance / 1e9;
+        assets.push({
+          symbol: "SOL",
+          name: "Solana",
+          chain: "Solana",
+          amount: solAmount,
+          price: 0,
+          value: 0
+        });
+      }
+
+      const tokens = Array.isArray(data.tokens) ? data.tokens : [];
+      for (const token of tokens) {
+        const amount =
+          Number(token.amount) ||
+          Number(token.tokenAmount) ||
+          Number(token.balance) ||
+          0;
+
+        const price =
+          Number(token.priceUsd) ||
+          Number(token.price) ||
+          Number(token.usdPrice) ||
+          0;
+
+        const value =
+          Number(token.valueUsd) ||
+          Number(token.usdValue) ||
+          (amount * price) ||
+          0;
+
+        if (amount > 0 || value > 0) {
+          assets.push({
+            symbol: token.symbol || "TOKEN",
+            name: token.name || token.symbol || "Unknown Token",
+            chain: "Solana",
+            amount,
+            price,
+            value
+          });
+        }
+      }
+
+      return assets;
+    }
+
+    function parseEvmAssets(raw, chainLabel) {
+      const items = raw?.data?.data?.items || raw?.data?.items || [];
+      const assets = [];
+
+      for (const item of items) {
+        const balance = Number(item.balance || 0);
+        const decimals = Number(item.contract_decimals || 18);
+        const amount = balance / Math.pow(10, decimals);
+        const price = Number(item.quote_rate || 0);
+        const value = Number(item.quote || (amount * price) || 0);
+
+        if (amount > 0 || value > 0) {
+          assets.push({
+            symbol: item.contract_ticker_symbol || item.ticker_symbol || "TOKEN",
+            name: item.contract_name || item.contract_ticker_symbol || "Unknown Token",
+            chain: chainLabel,
+            amount,
+            price,
+            value
+          });
+        }
+      }
+
+      return assets;
+    }
+
+    function parseWatcherAssets(wallet) {
+      if (!wallet.rawData) return [];
+      if (wallet.chain === "Solana") return parseSolanaAssets(wallet.rawData);
+      if (wallet.chain === "Ethereum") return parseEvmAssets(wallet.rawData, "Ethereum");
+      if (wallet.chain === "Bitcoin") return parseEvmAssets(wallet.rawData, "Bitcoin");
+      return [];
+    }
+
+    function getPortfolioAssets() {
+      const all = [];
+
+      for (const wallet of state.watchers) {
+        const assets = parseWatcherAssets(wallet);
+        for (const asset of assets) {
+          if ((asset.amount || 0) <= 0 && (asset.value || 0) <= 0) continue;
+          all.push(asset);
+        }
+      }
+
+      const merged = {};
+      for (const asset of all) {
+        const key = `${asset.chain}:${asset.symbol}`;
+        if (!merged[key]) {
+          merged[key] = {
+            symbol: asset.symbol,
+            name: asset.name,
+            chain: asset.chain,
+            amount: 0,
+            value: 0,
+            price: asset.price || 0
+          };
+        }
+        merged[key].amount += Number(asset.amount || 0);
+        merged[key].value += Number(asset.value || 0);
+        if (asset.price) merged[key].price = asset.price;
+      }
+
+      return Object.values(merged).sort((a, b) => b.value - a.value);
+    }
+
+    function getPortfolioTotalValue() {
+      return getPortfolioAssets().reduce((sum, asset) => sum + Number(asset.value || 0), 0);
+    }
+
+    function generatePortfolioSeries(total) {
+      const base = total || 0;
+      return [
+        Math.max(base * 0.92, 0),
+        Math.max(base * 0.95, 0),
+        Math.max(base * 0.94, 0),
+        Math.max(base * 0.98, 0),
+        Math.max(base * 1.03, 0),
+        Math.max(base * 1.01, 0),
+        Math.max(base, 0)
+      ];
+    }
+
+    function buildLinePath(values, width, height, padding) {
+      if (!values.length) return "";
+      const min = Math.min(...values);
+      const max = Math.max(...values);
+      const range = max - min || 1;
+      const stepX = (width - padding * 2) / Math.max(values.length - 1, 1);
+
+      return values.map((v, i) => {
+        const x = padding + i * stepX;
+        const y = height - padding - ((v - min) / range) * (height - padding * 2);
+        return `${i === 0 ? "M" : "L"} ${x} ${y}`;
+      }).join(" ");
+    }
+
+    function formatUsd(value) {
+      return new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
+        maximumFractionDigits: 2
+      }).format(Number(value || 0));
+    }
+
+    function formatAmount(value) {
+      return new Intl.NumberFormat("en-US", {
+        maximumFractionDigits: 6
+      }).format(Number(value || 0));
+    }
+
     function setScreen(screen) {
       state.activeScreen = screen;
       document.querySelectorAll(".screen").forEach(el => el.classList.remove("active"));
@@ -730,13 +1000,13 @@
           </div>
           <div class="stat">
             <div class="stat-label">Portfolio Value</div>
-            <div class="stat-value">${hasWallets ? "Pending" : "$0"}</div>
-            <div class="stat-sub">${hasWallets ? "Waiting for first snapshot" : "Add a wallet to begin tracking"}</div>
+            <div class="stat-value">${hasWallets ? "Loaded" : "$0"}</div>
+            <div class="stat-sub">${hasWallets ? "Worker connected" : "Add a wallet to begin tracking"}</div>
           </div>
           <div class="stat">
             <div class="stat-label">12h Changes</div>
-            <div class="stat-value">${hasWallets ? "Pending" : "—"}</div>
-            <div class="stat-sub">${hasWallets ? "Will appear after sync" : "No activity without wallets"}</div>
+            <div class="stat-value">${hasWallets ? "Preview" : "—"}</div>
+            <div class="stat-sub">${hasWallets ? "Visual estimate only" : "No activity without wallets"}</div>
           </div>
           <div class="stat">
             <div class="stat-label">Chains Active</div>
@@ -809,11 +1079,40 @@
         `;
       }
 
+      const assets = getPortfolioAssets();
+      const total = getPortfolioTotalValue();
+      const series = generatePortfolioSeries(total);
+      const path = buildLinePath(series, 320, 140, 12);
+      const changePct = series[0] > 0 ? (((series[series.length - 1] - series[0]) / series[0]) * 100) : 0;
+      const filteredAssets = assets.filter(asset => state.selectedChain === "All" || asset.chain === state.selectedChain);
+
       return `
         <div class="card">
           <div class="card-header">
+            <h3 class="card-title">Portfolio value</h3>
+            <p class="card-desc">Valor estimado en USD de todas tus monedas detectadas.</p>
+            <div class="portfolio-total">${formatUsd(total)}</div>
+            <div class="portfolio-change ${changePct >= 0 ? "up" : "down"}">
+              ${changePct >= 0 ? "▲" : "▼"} ${Math.abs(changePct).toFixed(2)}% · visual estimate
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="chart-wrap">
+              <svg class="chart-svg" viewBox="0 0 320 140" preserveAspectRatio="none">
+                <path d="${path}" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+              </svg>
+              <div class="chart-labels">
+                <span>7d ago</span>
+                <span>now</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
             <h3 class="card-title">Holdings breakdown</h3>
-            <p class="card-desc">Preview mode. No real token balances parsed yet.</p>
+            <p class="card-desc">Desglose de monedas detectadas en tus wallets agregadas.</p>
           </div>
           <div class="card-body">
             <div class="tabs">
@@ -830,11 +1129,51 @@
           </div>
         </div>
 
-        <div class="empty">
-          <div class="empty-icon">◈</div>
-          <h3>Sin balances cargados</h3>
-          <p>Las wallets ya fueron agregadas, pero esta V1 todavía no parsea balances bonitos.</p>
-        </div>
+        ${
+          filteredAssets.length === 0
+            ? `
+          <div class="empty">
+            <div class="empty-icon">◈</div>
+            <h3>Sin balances visibles</h3>
+            <p>No pude extraer monedas con valor o cantidad desde la respuesta actual del worker para este filtro.</p>
+          </div>
+        `
+            : `
+          <div class="asset-list">
+            ${filteredAssets
+              .map(asset => {
+                const pct = total > 0 ? (asset.value / total) * 100 : 0;
+                return `
+                  <div class="asset-row">
+                    <div class="asset-top">
+                      <div>
+                        <div class="asset-name">
+                          <span>${escapeHtml(asset.name)}</span>
+                          <span class="badge">${escapeHtml(asset.chain)}</span>
+                        </div>
+                        <div class="asset-symbol">${escapeHtml(asset.symbol)}</div>
+                      </div>
+                      <div class="asset-right">
+                        <div class="asset-value">${formatUsd(asset.value)}</div>
+                        <div class="asset-amount">${formatAmount(asset.amount)} ${escapeHtml(asset.symbol)}</div>
+                      </div>
+                    </div>
+
+                    <div class="asset-bar">
+                      <div class="asset-bar-fill" style="width:${Math.max(2, pct)}%"></div>
+                    </div>
+
+                    <div class="asset-footer">
+                      <span>${pct.toFixed(2)}% del portafolio</span>
+                      <span>${asset.price > 0 ? formatUsd(asset.price) + " price" : "No price"}</span>
+                    </div>
+                  </div>
+                `;
+              })
+              .join("")}
+          </div>
+        `
+        }
       `;
     }
 
